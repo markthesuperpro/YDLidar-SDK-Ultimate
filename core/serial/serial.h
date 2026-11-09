@@ -655,7 +655,7 @@ class Serial : public ChannelDevice {
 
   // Pimpl idiom, d_pointer
   class SerialImpl;
-  std::unique_ptr<SerialImpl> pimpl_;
+  std::shared_ptr<SerialImpl> pimpl_;
   SerialPortError m_serialErrno;       /// number of last error
 
 

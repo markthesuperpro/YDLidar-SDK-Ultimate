@@ -327,7 +327,7 @@ class YDLIDAR_API CYdLidar {
   std::unique_ptr<ydlidar::core::common::DriverInterface> lidarPtr; ///< LiDAR Driver Interface pointer
   uint64_t m_PointTime;             ///< Time interval between two sampling point
   uint64_t last_node_time;          ///< Latest LiDAR Start Node Time
-  node_info *global_nodes;          ///< global nodes buffer
+  std::unique_ptr<node_info[]> global_nodes; ///< Owned global scan-node buffer
   double last_frequency;            ///< Latest Scan Frequency
   uint64_t m_FristNodeTime;         ///< Calculate real-time sample rate start time
   uint64_t m_AllNode;               ///< Sum of sampling points

@@ -76,7 +76,7 @@ CYdLidar::CYdLidar() : lidarPtr(nullptr)
   m_Intensity = false;
   m_IntensityBit = 10;
   last_node_time = getTime();
-  global_nodes = new node_info[DriverInterface::MAX_SCAN_NODES];
+  global_nodes.reset(new node_info[DriverInterface::MAX_SCAN_NODES]);
   last_frequency = 0;
   m_FristNodeTime = getTime();
   m_AllNode = 0;
@@ -92,11 +92,7 @@ CYdLidar::CYdLidar() : lidarPtr(nullptr)
 CYdLidar::~CYdLidar()
 {
   disconnecting();
-  if (global_nodes)
-  {
-    delete[] global_nodes;
-    global_nodes = NULL;
-  }
+  global_nodes.reset();
 }
 
 bool CYdLidar::setlidaropt(int optname, const void *optval, int optlen)
@@ -521,7 +517,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
   uint64_t tim_scan_start = getTime();
   uint64_t startTs = tim_scan_start;
   //从缓存中获取已采集的一圈扫描数据
-  result_t op_result = lidarPtr->grabScanData(global_nodes, count, 1000);
+  result_t op_result = lidarPtr->grabScanData(global_nodes.get(), count, 1000);
   uint64_t tim_scan_end = getTime();
   uint64_t endTs = tim_scan_end;
   uint64_t sys_scan_time = tim_scan_end - tim_scan_start; //获取一圈数据所花费的时间
@@ -878,7 +874,7 @@ bool CYdLidar::getUserVersion(std::string &version)
     }
 
     size_t count = ydlidar::YDlidarDriver::MAX_SCAN_NODES;
-    result_t op_result = lidarPtr->grabScanData(global_nodes, count);
+    result_t op_result = lidarPtr->grabScanData(global_nodes.get(), count);
     if (IS_OK(op_result) && count > 2)
     {
         uint8_t userVerion = global_nodes[USERVERSIONNDEX].debugInfo;
@@ -1065,7 +1061,7 @@ bool CYdLidar::checkLidarAbnormal()
       checkOneCount ++;
       start_time = getTime();
       count = ydlidar::YDlidarDriver::MAX_SCAN_NODES;
-      ret = lidarPtr->grabScanData(global_nodes, count);
+      ret = lidarPtr->grabScanData(global_nodes.get(), count);
       end_time = getTime();
       scan_time = 1.0 * static_cast<int64_t>(end_time - start_time) / 1e9;
       
