@@ -61,14 +61,12 @@ class Serial::ScopedWriteLock {
 Serial::Serial(const string &port, uint32_t baudrate, serial::Timeout timeout,
                bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
                flowcontrol_t flowcontrol)
-  : pimpl_(new SerialImpl(port, baudrate, bytesize, parity,
-                          stopbits, flowcontrol)) {
+  : pimpl_(std::unique_ptr<SerialImpl>(new SerialImpl(port, baudrate, bytesize, parity,
+                          stopbits, flowcontrol))) {
   pimpl_->setTimeout(timeout);
 }
 
-Serial::~Serial() {
-  delete pimpl_;
-}
+Serial::~Serial() = default;
 
 bool Serial::open() {
   return pimpl_->open();

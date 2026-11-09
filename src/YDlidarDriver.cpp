@@ -22,6 +22,7 @@
 // SOFTWARE.
 //
 #include <math.h>
+#include <system_error>
 #include <algorithm>
 #include "core/common/ydlidar_help.h"
 #include "core/common/YdDataStream.h"
@@ -40,7 +41,7 @@ using namespace core::common;
 using namespace core::network;
 
 YDlidarDriver::YDlidarDriver(uint8_t type) 
- : _serial(NULL)
+ : _serial(nullptr)
 {
   m_isConnected = false;
   m_isScanning = false;
@@ -84,11 +85,7 @@ YDlidarDriver::~YDlidarDriver()
         _serial->closePort();
       }
     }
-    if (_serial)
-    {
-      delete _serial;
-      _serial = NULL;
-    }
+    _serial.reset();
   }
 
   {
@@ -112,17 +109,17 @@ result_t YDlidarDriver::connect(const char *port_path, uint32_t baudrate)
     {
       if (YDLIDAR_TYPE_TCP == m_DeviceType)
       {
-        _serial = new CActiveSocket();
+        _serial.reset(new CActiveSocket());
       }
       else if (YDLIDAR_TYPE_UDP == m_DeviceType)
       {
-        _serial = new CActiveSocket(CSimpleSocket::SocketTypeUdp);
+        _serial.reset(new CActiveSocket(CSimpleSocket::SocketTypeUdp));
       }
       else
       {
-        _serial = new serial::Serial(
+        _serial.reset(new serial::Serial(
           m_port, m_baudrate,
-          serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT/2));
+          serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT/2)));
       }
       _serial->bindport(port_path, baudrate);
     }
@@ -133,7 +130,7 @@ result_t YDlidarDriver::connect(const char *port_path, uint32_t baudrate)
     }
     if (YDLIDAR_TYPE_SERIAL != m_DeviceType)
     {
-      CActiveSocket* s = dynamic_cast<CActiveSocket*>(_serial);
+      CActiveSocket* s = dynamic_cast<CActiveSocket*>(_serial.get());
       if (s)
         s->SetReceiveTimeout(SDK_TIMEOUT / SDK_UNIT1000, 0);
     }
@@ -215,33 +212,21 @@ void YDlidarDriver::disconnect()
 
 void YDlidarDriver::stopThread()
 {
+  // Request shutdown and wake any blocking read before joining the worker.
   m_isScanning = false;
   _dataEvent.set();
-  if (m_thread)
-  {
-    if (m_thread->joinable())
-      {
-        auto deadline = std::chrono::steady_clock::now() +
-                        std::chrono::milliseconds(DEFAULT_TIMEOUT + 500);
-        while (m_thread->joinable() &&
-               std::chrono::steady_clock::now() < deadline)
-        {
-          std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
 
-        if (m_thread->joinable())
-        {
-          fprintf(stderr, "[YDLIDAR-SDK] disableDataGrabbing: thread did not exit within timeout, detaching\n");
-          m_thread->detach();
-        }
-        else
-        {
-          m_thread->join();
-        }
-      }
-    delete m_thread;
-    m_thread = nullptr;
+  if (m_thread && m_thread->joinable())
+  {
+    if (m_thread->get_id() == std::this_thread::get_id())
+    {
+      error("stopThread cannot join its own worker thread");
+      return;
+    }
+    m_thread->join();
   }
+
+  m_thread.reset();
 }
 
 bool YDlidarDriver::isscanning() const
@@ -458,7 +443,6 @@ int YDlidarDriver::cacheScanData()
   m_data.clear();
   m_datas.clear();
 
-  m_isScanning = true; //标记扫描线程开始
   while (m_isScanning)
   {
     ans = parseData(TIMEOUT_500);
@@ -1000,14 +984,25 @@ result_t YDlidarDriver::stopScan(uint32_t timeout)
 
 result_t YDlidarDriver::startThread()
 {
-  m_thread = new std::thread(&YDlidarDriver::cacheScanData, this);
-  if (!m_thread)
+  if (m_thread && m_thread->joinable())
   {
-    error("[YDLIDAR] Fail to create thread");
+    error("A scan thread is already running");
     return RESULT_FAIL;
   }
 
-  info("[YDLIDAR] Create thread 0x%X", m_thread->get_id());
+  try
+  {
+    m_isScanning = true;
+    m_thread.reset(new std::thread(&YDlidarDriver::cacheScanData, this));
+  }
+  catch (const std::system_error &e)
+  {
+    m_isScanning = false;
+    error("Failed to create scan thread: %s", e.what());
+    return RESULT_FAIL;
+  }
+
+  info("[YDLIDAR] Scan thread started");
   return RESULT_OK;
 }
 

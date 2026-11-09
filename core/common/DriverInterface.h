@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <map>
+#include <atomic>
 #include <thread>
 #include <core/base/v8stdint.h>
 #include <core/base/thread.h>

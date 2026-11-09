@@ -44,6 +44,7 @@
 #ifndef CYDLIDAR_H
 #define CYDLIDAR_H
 #include <core/base/utils.h>
+#include <memory>
 #include <core/common/ydlidar_def.h>
 #include <core/common/DriverInterface.h>
 #include <string>
@@ -323,7 +324,7 @@ class YDLIDAR_API CYdLidar {
   int     lidar_model;              ///< LiDAR Model
   uint8_t Major;                    ///< Firmware Major Version
   uint8_t Minjor;                   ///< Firmware Minjor Version
-  ydlidar::core::common::DriverInterface *lidarPtr; ///< LiDAR Driver Interface pointer
+  std::unique_ptr<ydlidar::core::common::DriverInterface> lidarPtr; ///< LiDAR Driver Interface pointer
   uint64_t m_PointTime;             ///< Time interval between two sampling point
   uint64_t last_node_time;          ///< Latest LiDAR Start Node Time
   node_info *global_nodes;          ///< global nodes buffer

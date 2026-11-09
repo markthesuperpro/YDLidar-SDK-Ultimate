@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <system_error>
 #include <errno.h>
 #include <algorithm>
 #include "core/network/PassiveSocket.h"
@@ -269,10 +270,15 @@ result_t TiaLidarDriver::getDeviceInfo(device_info &di, uint32_t timeout)
 
 bool TiaLidarDriver::startThread()
 {
-    m_thread = new std::thread(&TiaLidarDriver::parseScanDataThread, this);
-    if (!m_thread)
+    try
     {
-      error("Fail to create data thread");
+      m_isScanning = true;
+      m_thread.reset(new std::thread(&TiaLidarDriver::parseScanDataThread, this));
+    }
+    catch (const std::system_error &e)
+    {
+      m_isScanning = false;
+      error("Fail to create data thread: %s", e.what());
       return false;
     }
     info("Create TIA thread 0x%X", m_thread->get_id());
@@ -386,15 +392,13 @@ void TiaLidarDriver::deleteThread()
     {
       if (m_thread->joinable())
         m_thread->join();
-      delete m_thread;
-      m_thread = nullptr;
+      m_thread.reset();
     }
     if (m_thread2)
     {
       if (m_thread2->joinable())
         m_thread2->join();
-      delete m_thread2;
-      m_thread2 = nullptr;
+      m_thread2.reset();
     }
 }
 
@@ -529,8 +533,6 @@ int TiaLidarDriver::parseScanDataThread()
     memset(local_scan, 0, sizeof(local_scan));
     lastZeroTime = getms();
     lastPackIndex = 0;
-
-    m_isScanning = true;
 
     while (m_isScanning)
     {

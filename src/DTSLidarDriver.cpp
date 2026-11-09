@@ -42,8 +42,7 @@ DTSLidarDriver::~DTSLidarDriver()
                 _serial->flush();
                 _serial->closePort();
             }
-            delete _serial;
-            _serial = NULL;
+            _serial.reset();
         }
     }
 
@@ -66,10 +65,10 @@ result_t DTSLidarDriver::connect(const char *port, uint32_t baudrate)
         ScopedLocker l(_cmd_lock);
         if (!_serial)
         {
-            _serial = new serial::Serial(
+            _serial.reset(new serial::Serial(
                 m_port,
                 m_baudrate,
-                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT));
+                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT)));
         }
         if (!_serial->open())
         {
@@ -819,8 +818,7 @@ result_t DTSLidarDriver::checkAutoConnecting()
                 {
                     m_isConnected = false;
                     _serial->closePort();
-                    delete _serial;
-                    _serial = nullptr;
+                    _serial.reset();
                 }
             }
         }

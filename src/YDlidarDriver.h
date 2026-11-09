@@ -39,6 +39,7 @@
 #ifndef YDLIDAR_DRIVER_H
 #define YDLIDAR_DRIVER_H
 #include <stdlib.h>
+#include <memory>
 #include <atomic>
 #include <map>
 #include <core/common/ChannelDevice.h>
@@ -465,7 +466,7 @@ private:
   };
 
 private:
-  ChannelDevice *_serial = NULL; //通信对象
+  std::unique_ptr<ChannelDevice> _serial; //通信对象
   uint32_t trans_delay; //传输延时
   int m_sampling_rate; //采样率
   int sample_rate; //采样率

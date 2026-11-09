@@ -50,6 +50,7 @@
 #define GS2_YDLIDAR_DRIVER_H
 
 #include <stdlib.h>
+#include <memory>
 #include <atomic>
 #include <map>
 #include <list>
@@ -481,7 +482,7 @@ namespace ydlidar
 
   private:
     int PackageSampleBytes; //一个包包含的激光点数
-    ChannelDevice *_comm = nullptr; //通讯对象
+    std::unique_ptr<ChannelDevice> _comm; //通讯对象
     uint32_t trans_delay; //串口传输一个byte时间
     int sample_rate; //采样频率
 

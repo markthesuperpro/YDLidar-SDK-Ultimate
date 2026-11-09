@@ -1626,8 +1626,7 @@ bool CYdLidar::checkConnect()
   if (lidarPtr && 
     lidarPtr->getLidarType() != m_LidarType)
   {
-    delete lidarPtr;
-    lidarPtr = nullptr;
+    lidarPtr.reset();
   }
   //如果未创建对象
   if (!lidarPtr)
@@ -1636,17 +1635,17 @@ bool CYdLidar::checkConnect()
 
     //根据雷达类型创建对应的实例
     if (isNetTOFLidar(m_LidarType))
-      lidarPtr = new ydlidar::ETLidarDriver(); //T15
+      lidarPtr.reset(new ydlidar::ETLidarDriver()); //T15
     else if (isGSLidar(m_LidarType)) //GS
-      lidarPtr = new ydlidar::GSLidarDriver(m_DeviceType);
+      lidarPtr.reset(new ydlidar::GSLidarDriver(m_DeviceType));
     else if (isSDMLidar(m_LidarType)) //SDM
-      lidarPtr = new ydlidar::SDMLidarDriver();
+      lidarPtr.reset(new ydlidar::SDMLidarDriver());
     else if (isDTSLidar(m_LidarType)) //SDM
-      lidarPtr = new ydlidar::DTSLidarDriver();
+      lidarPtr.reset(new ydlidar::DTSLidarDriver());
     else if (isTIALidar(m_LidarType))
-      lidarPtr = new ydlidar::TiaLidarDriver();
+      lidarPtr.reset(new ydlidar::TiaLidarDriver());
     else //通用雷达
-      lidarPtr = new ydlidar::YDlidarDriver(m_DeviceType);
+      lidarPtr.reset(new ydlidar::YDlidarDriver(m_DeviceType));
 
     if (!lidarPtr)
     {

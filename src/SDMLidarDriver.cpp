@@ -77,11 +77,7 @@ SDMLidarDriver::~SDMLidarDriver()
             _serial->closePort();
         }
     }
-    if (_serial)
-    {
-        delete _serial;
-        _serial = NULL;
-    }
+    _serial.reset();
 
     if (scan_node_buf)
     {
@@ -98,10 +94,10 @@ result_t SDMLidarDriver::connect(const char *port, uint32_t baudrate)
         ScopedLocker l(_cmd_lock);
         if (!_serial)
         {
-            _serial = new serial::Serial(
+            _serial.reset(new serial::Serial(
                 m_port,
                 m_baudrate,
-                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT));
+                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT)));
         }
         if (!_serial->open())
         {
@@ -411,8 +407,7 @@ result_t SDMLidarDriver::checkAutoConnecting()
                 {
                     m_isConnected = false;
                     _serial->closePort();
-                    delete _serial;
-                    _serial = NULL;
+                    _serial.reset();
                 }
             }
         }

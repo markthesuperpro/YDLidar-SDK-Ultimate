@@ -32,6 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 #include <math.h>
+#include <system_error>
 #include <fstream>
 #include <algorithm>
 #include "GSLidarDriver.h"
@@ -102,8 +103,7 @@ GSLidarDriver::~GSLidarDriver()
             _comm->flush();
             _comm->closePort();
         }
-        delete _comm;
-        _comm = NULL;
+        _comm.reset();
     }
 
     if (globalRecvBuffer) {
@@ -126,12 +126,12 @@ result_t GSLidarDriver::connect(const char *port_path, uint32_t baudrate)
         {
             if (m_DeviceType == YDLIDAR_TYPE_TCP)
             {
-                _comm = new CActiveSocket();
+                _comm.reset(new CActiveSocket());
             }
             else
             {
-                _comm = new serial::Serial(m_port, m_baudrate,
-                    serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT));
+                _comm.reset(new serial::Serial(m_port, m_baudrate,
+                    serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT)));
             }
             _comm->bindport(port_path, baudrate);
         }
@@ -212,16 +212,13 @@ void GSLidarDriver::disconnect() {
 
 void GSLidarDriver::disableDataGrabbing()
 {
-    if (m_isScanning) {
-        m_isScanning = false;
-        _dataEvent.set();
-    }
+    m_isScanning = false;
+    _dataEvent.set();
     if (m_thread)
     {
         if (m_thread->joinable())
             m_thread->join();
-        delete m_thread;
-        m_thread = nullptr;
+        m_thread.reset();
     }
     // _thread.join();
 }
@@ -591,8 +588,6 @@ int GSLidarDriver::cacheScanData()
     int timeoutCount = 0;
     retryCount = 0;
     lastStamp = 0;
-
-    m_isScanning = true;
 
   //打印帧间隔相关
 //   std::map<int, uint32_t> ts;
@@ -1447,10 +1442,15 @@ result_t GSLidarDriver::stopScan(uint32_t timeout)
 
 result_t GSLidarDriver::startThread()
 {
-    m_thread = new std::thread(&GSLidarDriver::cacheScanData, this);
-    if (!m_thread)
+    try
     {
-        error("Fail to create GS thread");
+        m_isScanning = true;
+        m_thread.reset(new std::thread(&GSLidarDriver::cacheScanData, this));
+    }
+    catch (const std::system_error &e)
+    {
+        m_isScanning = false;
+        error("Fail to create GS thread: %s", e.what());
         return RESULT_FAIL;
     }
 
