@@ -22,6 +22,7 @@
 // SOFTWARE.
 //
 #include <math.h>
+#include <fmt/format.h>
 #include <system_error>
 #include <algorithm>
 #include "core/common/ydlidar_help.h"
@@ -475,7 +476,7 @@ int YDlidarDriver::cacheScanData()
         timeoutCount++;
         if (m_driverErrno == NoError)
           setDriverError(TimeoutError);
-        error("Timeout count: %d", timeoutCount);
+        sdkLogger().error(fmt::format("Timeout count: {}", timeoutCount));
       }
     }
     else
@@ -610,7 +611,7 @@ result_t YDlidarDriver::parseData(uint32_t timeout)
           }
           if (csc != csr)
           {
-            error("Checksum error c[0x%02X] != r[0x%02X]", csc, csr);
+            sdkLogger().error(fmt::format("Checksum error c[0x{:02X}] != r[0x{:02X}]", csc, csr));
           }
           else
           {
@@ -652,7 +653,7 @@ result_t YDlidarDriver::parseData(uint32_t timeout)
       case 3:
         if (c > TRI_PACKMAXNODES)
         {
-            warn("Current pack point count %d too big", c);
+            sdkLogger().warning(fmt::format("Current pack point count {} too big", c));
             recvPos = 0;
             continue;
         }

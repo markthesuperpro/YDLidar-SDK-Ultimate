@@ -22,6 +22,7 @@
 // SOFTWARE.
 //
 #include <map>
+#include <fmt/format.h>
 #include <numeric>
 #include <algorithm>
 #include <math.h>
@@ -418,7 +419,7 @@ bool CYdLidar::initialize()
             m_SerialPort.c_str(), m_SerialBaudrate);
     return false;
   }
-  info("Lidar init success, elapsed time [%u]ms", getms() - t);
+  sdkLogger().info(fmt::format("Lidar init success, elapsed time [{}] ms", getms() - t));
   return true;
 }
 
@@ -766,7 +767,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
       if (outscan.points.size() > all_node_count)
       {
         //如果点过多则直接删除多余的点并打印警告
-        warn("[YDLIDAR]: Real points %lu > fixed points %d", count, all_node_count);
+        sdkLogger().warning(fmt::format("[YDLIDAR] Real points {} > fixed points {}", outscan.points.size(), all_node_count));
       	outscan.points.resize(all_node_count);
       }
       else if (outscan.points.size() < all_node_count && !outscan.points.empty())
@@ -786,9 +787,8 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
   }
   else
   {
-    error("[YDLIDAR]: %d %s\n",
-      op_result,
-      DriverInterface::DescribeDriverError(lidarPtr->getDriverError()));
+    sdkLogger().error(fmt::format("YDLIDAR driver error {}: {}", op_result,
+        DriverInterface::DescribeDriverError(lidarPtr->getDriverError())));
 
     m_AllNode = 0;
     m_FristNodeTime = tim_scan_start;
