@@ -81,8 +81,8 @@ GSLidarDriver::GSLidarDriver(uint8_t type)
     moduleNum           = 0;
 
     nodeIndex = 0;
-    globalRecvBuffer = new uint8_t[GSPACKSIZE];
-    scan_node_buf = new node_info[MAX_SCAN_NODES];
+    globalRecvBuffer.reset(new uint8_t[GSPACKSIZE]);
+    scan_node_buf.reset(new node_info[MAX_SCAN_NODES]);
     for (int i=0; i<LIDAR_MAXCOUNT; ++i)
     {
         k0[i] = 0;
@@ -107,12 +107,10 @@ GSLidarDriver::~GSLidarDriver()
     }
 
     if (globalRecvBuffer) {
-        delete[] globalRecvBuffer;
-        globalRecvBuffer = NULL;
+        globalRecvBuffer.reset();
     }
     if (scan_node_buf) {
-        delete[] scan_node_buf;
-        scan_node_buf = NULL;
+        scan_node_buf.reset();
     }
 }
 
@@ -692,7 +690,7 @@ result_t GSLidarDriver::waitPackage(node_info *node, uint32_t timeout)
                 return ret;
             if (recvSize > remainSize)
                 recvSize = remainSize;
-            getData(globalRecvBuffer, recvSize);
+            getData(globalRecvBuffer.get(), recvSize);
 
 PARSEHEAD:
             for (size_t i = 0; i < recvSize; ++i)
@@ -791,7 +789,7 @@ PARSEHEAD:
                                 return ret;
                             if (recvSize > remainSize)
                                 recvSize = remainSize;
-                            getData(globalRecvBuffer, recvSize);
+                            getData(globalRecvBuffer.get(), recvSize);
                         }
 
                         for (size_t j = offset; j < recvSize; ++j)
@@ -1225,7 +1223,7 @@ result_t GSLidarDriver::ascendScanData(node_info *nodebuffer, size_t count) {
         pre_degree = degree;
     }
 
-    node_info *tmpbuffer = new node_info[count];
+    std::unique_ptr<node_info[]> tmpbuffer(new node_info[count]);
 
     for (i = (int)zero_pos; i < (int)count; i++) {
         tmpbuffer[i - zero_pos] = nodebuffer[i];
@@ -1235,8 +1233,7 @@ result_t GSLidarDriver::ascendScanData(node_info *nodebuffer, size_t count) {
         tmpbuffer[i + (int)count - zero_pos] = nodebuffer[i];
     }
 
-    memcpy(nodebuffer, tmpbuffer, count * sizeof(node_info));
-    delete[] tmpbuffer;
+    memcpy(nodebuffer, tmpbuffer.get(), count * sizeof(node_info));
 
     return RESULT_OK;
 }
@@ -1342,11 +1339,10 @@ void GSLidarDriver::setIntensities(const bool &isintensities)
 {
     if (m_intensities != isintensities) {
         if (globalRecvBuffer) {
-            delete[] globalRecvBuffer;
-            globalRecvBuffer = NULL;
+            globalRecvBuffer.reset();
         }
 
-        globalRecvBuffer = new uint8_t[GSPACKSIZE];
+        globalRecvBuffer.reset(new uint8_t[GSPACKSIZE]);
     }
 
     m_intensities = isintensities;

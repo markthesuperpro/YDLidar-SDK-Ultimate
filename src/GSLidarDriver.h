@@ -492,7 +492,7 @@ namespace ydlidar
     uint8_t CheckSumCal;
     bool CheckSumResult;
 
-    uint8_t *globalRecvBuffer = nullptr;
+    std::unique_ptr<uint8_t[]> globalRecvBuffer;
 
     double k0[LIDAR_MAXCOUNT];
     double k1[LIDAR_MAXCOUNT];

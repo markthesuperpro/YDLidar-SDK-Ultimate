@@ -54,12 +54,12 @@ ETLidarDriver::ETLidarDriver() :
   m_sampleRate(20000),
   m_force_update(false) {
 
-  socket_cmd = new CActiveSocket(CSimpleSocket::SocketTypeTcp);
-  socket_data = new CPassiveSocket(CSimpleSocket::SocketTypeUdp);
+  socket_cmd.reset(new CActiveSocket(CSimpleSocket::SocketTypeTcp));
+  socket_data.reset(new CPassiveSocket(CSimpleSocket::SocketTypeUdp));
   socket_data->SetSocketType(CSimpleSocket::SocketTypeUdp);
   socket_cmd->SetConnectTimeout(DEFAULT_CONNECTION_TIMEOUT_SEC,
                                 DEFAULT_CONNECTION_TIMEOUT_USEC);
-  scan_node_buf = new node_info[MAX_SCAN_NODES];
+  scan_node_buf.reset(new node_info[MAX_SCAN_NODES]);
   scan_node_count = 0;
   m_lastAngle = 0.f;
   m_currentAngle = 0.f;
@@ -92,20 +92,17 @@ ETLidarDriver::~ETLidarDriver() {
   ScopedLocker data_lock(_data_lock);
 
   if (socket_data) {
-    delete socket_data;
-    socket_data = NULL;
+    socket_data.reset();
   }
 
   ScopedLocker lock(_cmd_lock);
 
   if (socket_cmd) {
-    delete socket_cmd;
-    socket_cmd = NULL;
+    socket_cmd.reset();
   }
 
   if (scan_node_buf) {
-    delete[]  scan_node_buf;
-    scan_node_buf = nullptr;
+    scan_node_buf.reset();
   }
 }
 
@@ -183,10 +180,10 @@ void ETLidarDriver::setAutoReconnect(const bool &enable) {
 const char *ETLidarDriver::DescribeError(bool isTCP) {
   if (isTCP) {
     ScopedLocker lock(_cmd_lock);
-    return socket_cmd != NULL ? socket_cmd->DescribeError() : "NO Socket";
+    return socket_cmd != nullptr ? socket_cmd->DescribeError() : "NO Socket";
   } else {
     ScopedLocker lock(_data_lock);
-    return socket_data != NULL ? socket_data->DescribeError() : "NO Socket";
+    return socket_data != nullptr ? socket_data->DescribeError() : "NO Socket";
   }
 }
 
@@ -659,7 +656,7 @@ result_t ETLidarDriver::grabScanData(node_info *nodebuffer, size_t &count,
 
       ScopedLocker l(_lock);
       size_t size_to_copy = std::min(count, scan_node_count);
-      memcpy(nodebuffer, scan_node_buf, size_to_copy * sizeof(node_info));
+      memcpy(nodebuffer, scan_node_buf.get(), size_to_copy * sizeof(node_info));
       count = size_to_copy;
       scan_node_count = 0;
     }
@@ -1079,7 +1076,7 @@ int ETLidarDriver::cacheScanData() {
           local_scan[0].stamp = local_buf[pos].stamp;
           local_scan[0].delayTime = local_buf[pos].delayTime;
           local_scan[0].scanFreq = local_buf[pos].scanFreq;
-          memcpy(scan_node_buf, local_scan, scan_count * sizeof(node_info));
+          memcpy(scan_node_buf.get(), local_scan, scan_count * sizeof(node_info));
           scan_node_count = scan_count;
           _dataEvent.set();
           _lock.unlock();

@@ -71,7 +71,7 @@ namespace ydlidar
                             m_baudrate(8000),
                             m_intensities(false),
                             m_intensityBit(0),
-                            scan_node_buf(NULL),
+                            scan_node_buf(nullptr),
                             scan_node_count(0),
                             nodeIndex(0),
                             retryCount(0),
@@ -613,7 +613,7 @@ namespace ydlidar
         int m_intensityBit = 0;
 
         /// LiDAR Point pointer
-        node_info *scan_node_buf = nullptr;
+        std::unique_ptr<node_info[]> scan_node_buf;
         /// LiDAR scan count
         size_t scan_node_count = 0; //LiDAR Scan Count
         /// package sample index

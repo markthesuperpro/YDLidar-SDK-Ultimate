@@ -59,7 +59,7 @@ SDMLidarDriver::SDMLidarDriver()
     recvBuff = std::vector<uint8_t>(SDKSDMPCSSIZE, 0);
 
     scan_node_count = 0;
-    scan_node_buf = new node_info[SDK_SDM_POINT_COUNT * 5];
+    scan_node_buf.reset(new node_info[SDK_SDM_POINT_COUNT * 5]);
 }
 
 SDMLidarDriver::~SDMLidarDriver()
@@ -81,8 +81,7 @@ SDMLidarDriver::~SDMLidarDriver()
 
     if (scan_node_buf)
     {
-        delete[] scan_node_buf;
-        scan_node_buf = NULL;
+        scan_node_buf.reset();
     }
 }
 
@@ -517,7 +516,7 @@ int SDMLidarDriver::cacheScanData()
 
             // printf("[YDLIDAR] SDM points Stored in buffer %lu\n", count);
             ScopedLocker l(_lock);
-            memcpy(scan_node_buf, local_buf, sizeof(node_info) * SDK_SDM_POINT_COUNT);
+            memcpy(scan_node_buf.get(), local_buf, sizeof(node_info) * SDK_SDM_POINT_COUNT);
             scan_node_count = SDK_SDM_POINT_COUNT; // 一个包固定1个点
             _dataEvent.set();
             scan_count = 0;
@@ -694,7 +693,7 @@ result_t SDMLidarDriver::grabScanData(
     {
         ScopedLocker l(_lock);
         size_t size_to_copy = min(count, scan_node_count);
-        memcpy(nodebuffer, scan_node_buf, size_to_copy * SDKNODESIZE);
+        memcpy(nodebuffer, scan_node_buf.get(), size_to_copy * SDKNODESIZE);
         count = size_to_copy;
         scan_node_count = 0;
         return RESULT_OK;

@@ -65,7 +65,7 @@ YDlidarDriver::YDlidarDriver(uint8_t type)
   m_LidarType = TYPE_TRIANGLE;
   m_DeviceType = type;
 
-  scan_node_buf = new node_info[MAX_SCAN_NODES];
+  scan_node_buf.reset(new node_info[MAX_SCAN_NODES]);
   scan_node_count = 0;
 
   m_HasDeviceInfo = EPT_None;
@@ -93,8 +93,7 @@ YDlidarDriver::~YDlidarDriver()
     ScopedLocker l(_lock);
     if (scan_node_buf)
     {
-      delete[] scan_node_buf;
-      scan_node_buf = NULL;
+      scan_node_buf.reset();
     }
   }
 }
@@ -769,7 +768,7 @@ result_t YDlidarDriver::grabScanData(
   {
     ScopedLocker l(_lock);
     size_t size_to_copy = min(count, scan_node_count);
-    memcpy(nodes, scan_node_buf, size_to_copy * sizeof(node_info));
+    memcpy(nodes, scan_node_buf.get(), size_to_copy * sizeof(node_info));
     count = size_to_copy;
     scan_node_count = 0;
     return RESULT_OK;
@@ -1658,7 +1657,7 @@ bool YDlidarDriver::parsePoints()
         if (nodes.size() <= MAX_SCAN_NODES)
         {
             ScopedLocker l(_lock);
-            memcpy(scan_node_buf, nodes.data(), nodes.size() * SDKNODESIZE);
+            memcpy(scan_node_buf.get(), nodes.data(), nodes.size() * SDKNODESIZE);
             scan_node_count = nodes.size();
             _dataEvent.set();
         }

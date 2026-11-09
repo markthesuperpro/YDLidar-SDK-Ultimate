@@ -27,12 +27,12 @@ using namespace ydlidar::core::common;
 
 TiaLidarDriver::TiaLidarDriver()
 {
-    socket_cmd = new core::network::CActiveSocket(CSimpleSocket::SocketTypeTcp);
-    socket_data = new core::network::CPassiveSocket(CSimpleSocket::SocketTypeUdp);
+    socket_cmd.reset(new core::network::CActiveSocket(CSimpleSocket::SocketTypeTcp));
+    socket_data.reset(new core::network::CPassiveSocket(CSimpleSocket::SocketTypeUdp));
     socket_data->SetSocketType(CSimpleSocket::SocketTypeUdp);
     socket_cmd->SetConnectTimeout(DEFAULT_CONNECTION_TIMEOUT_SEC,
                                   DEFAULT_CONNECTION_TIMEOUT_USEC);
-    scan_node_buf = new node_info[LIDAR_MAXNODES];
+    scan_node_buf.reset(new node_info[LIDAR_MAXNODES]);
     scan_node_count = 0;
     nodeIndex = 0;
     retryCount = 0;
@@ -56,18 +56,15 @@ TiaLidarDriver::~TiaLidarDriver()
 
     ScopedLocker l2(_lock2);
     if (socket_data) {
-        delete socket_data;
-        socket_data = NULL;
+        socket_data.reset();
     }
     ScopedLocker l(_lock);
     if (socket_cmd) {
-        delete socket_cmd;
-        socket_cmd = NULL;
+        socket_cmd.reset();
     }
 
     if (scan_node_buf) {
-        delete[] scan_node_buf;
-        scan_node_buf = nullptr;
+        scan_node_buf.reset();
     }
 }
 
@@ -126,12 +123,12 @@ const char *TiaLidarDriver::DescribeError(bool isTCP)
     if (isTCP)
     {
         ScopedLocker lock(_lock);
-        return socket_cmd != NULL ? socket_cmd->DescribeError() : "NO Socket";
+        return socket_cmd != nullptr ? socket_cmd->DescribeError() : "NO Socket";
     }
     else
     {
         ScopedLocker lock(_lock2);
-        return socket_data != NULL ? socket_data->DescribeError() : "NO Socket";
+        return socket_data != nullptr ? socket_data->DescribeError() : "NO Socket";
     }
 }
 
@@ -424,7 +421,7 @@ result_t TiaLidarDriver::grabScanData(
         {
             ScopedLocker l(_lock);
             size_t size_to_copy = std::min(count, scan_node_count);
-            memcpy(nodebuffer, scan_node_buf, size_to_copy * sizeof(node_info));
+            memcpy(nodebuffer, scan_node_buf.get(), size_to_copy * sizeof(node_info));
             count = size_to_copy;
             scan_node_count = 0;
             ret = RESULT_OK;
@@ -578,7 +575,7 @@ int TiaLidarDriver::parseScanDataThread()
                 {
                     {
                         ScopedLocker l(_lock);
-                        memcpy(scan_node_buf, local_scan, scan_count * SDKNODESIZE);
+                        memcpy(scan_node_buf.get(), local_scan, scan_count * SDKNODESIZE);
                         scan_node_count = scan_count;
                         _dataEvent.set();
                     }
