@@ -220,7 +220,25 @@ void YDlidarDriver::stopThread()
   if (m_thread)
   {
     if (m_thread->joinable())
-      m_thread->join();
+      {
+        auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::milliseconds(DEFAULT_TIMEOUT + 500);
+        while (m_thread->joinable() &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        if (m_thread->joinable())
+        {
+          fprintf(stderr, "[YDLIDAR-SDK] disableDataGrabbing: thread did not exit within timeout, detaching\n");
+          m_thread->detach();
+        }
+        else
+        {
+          m_thread->join();
+        }
+      }
     delete m_thread;
     m_thread = nullptr;
   }
