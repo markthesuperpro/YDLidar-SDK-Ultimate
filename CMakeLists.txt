@@ -82,6 +82,7 @@ option( BUILD_SHARED_LIBS "Build shared libraries." OFF)
 option( BUILD_EXAMPLES "Build Example." ON)
 option( BUILD_CSHARP "Build CSharp." OFF)
 option( BUILD_TEST "Build Test." OFF)
+option( BUILD_PYTHON "Build Python bindings when SWIG and Python are available." ON)
 
 ############################################################################
 # find package
@@ -151,6 +152,7 @@ install(TARGETS fmt
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include
+    PUBLIC_HEADER DESTINATION include/fmt
 )
 
 #############################################################################################
@@ -170,7 +172,7 @@ enable_testing()
 
 ############################################################################
 # build ydlidar sdk python version
-if(${SWIG_FOUND} AND ${PYTHONLIBS_FOUND})
+if(BUILD_PYTHON AND SWIG_FOUND AND PYTHONLIBS_FOUND)
     message(STATUS "build python API....")
     include_directories(python)
     add_subdirectory(python)

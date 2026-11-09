@@ -22,6 +22,7 @@ jobs:
           cmake -S . -B build
           -DBUILD_EXAMPLES=OFF
           -DBUILD_TEST=OFF
+          -DBUILD_PYTHON=OFF
           -DBUILD_SHARED_LIBS=OFF
           -DCMAKE_BUILD_TYPE=Release
 
