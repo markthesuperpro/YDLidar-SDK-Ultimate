@@ -568,7 +568,7 @@ void NoiseFilter::filter_tail2(
             noiseCount ++;
         }
     }
-    printf("Noise count %lu\n", noiseCount);
+    printf("Noise count %zu\n", noiseCount);
 }
 
 void NoiseFilter::setStrategy(int value)
