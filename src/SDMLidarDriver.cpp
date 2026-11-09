@@ -43,7 +43,7 @@ namespace ydlidar
 {
 
 SDMLidarDriver::SDMLidarDriver() 
-    : _serial(NULL)
+    : _serial(nullptr)
 {
     // 串口配置参数
     m_intensities = false;

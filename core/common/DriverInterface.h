@@ -2,6 +2,7 @@
 #include <map>
 #include <atomic>
 #include <thread>
+#include <memory>
 #include <core/base/v8stdint.h>
 #include <core/base/thread.h>
 #include <core/base/locker.h>
@@ -586,7 +587,7 @@ namespace ydlidar
       protected:
         /* Variable for LIDAR compatibility */
         /// LiDAR Scanning state
-        bool m_isScanning = false;
+        std::atomic<bool> m_isScanning{false};
         /// LiDAR connected state
         bool m_isConnected = false;
         /// Scan Data Event
@@ -595,8 +596,8 @@ namespace ydlidar
         Locker _lock;
         /// Parse Data thread
         Thread _thread; //线程对象
-        std::thread* m_thread = nullptr; //STD线程对象
-        std::thread* m_thread2 = nullptr; //STD线程对象
+        std::unique_ptr<std::thread> m_thread; //Owned scan thread
+        std::unique_ptr<std::thread> m_thread2; //Owned secondary thread
         /// command locker（不支持嵌套）
         Locker _cmd_lock;
         /// driver error locker（不支持嵌套）
