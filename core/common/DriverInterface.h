@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include <map>
+#include <atomic>
 #include <thread>
+#include <memory>
 #include <core/base/v8stdint.h>
 #include <core/base/thread.h>
 #include <core/base/locker.h>
@@ -69,7 +71,7 @@ namespace ydlidar
                             m_baudrate(8000),
                             m_intensities(false),
                             m_intensityBit(0),
-                            scan_node_buf(NULL),
+                            scan_node_buf(nullptr),
                             scan_node_count(0),
                             nodeIndex(0),
                             retryCount(0),
@@ -585,7 +587,7 @@ namespace ydlidar
       protected:
         /* Variable for LIDAR compatibility */
         /// LiDAR Scanning state
-        bool m_isScanning = false;
+        std::atomic<bool> m_isScanning{false};
         /// LiDAR connected state
         bool m_isConnected = false;
         /// Scan Data Event
@@ -594,8 +596,8 @@ namespace ydlidar
         Locker _lock;
         /// Parse Data thread
         Thread _thread; //线程对象
-        std::thread* m_thread = nullptr; //STD线程对象
-        std::thread* m_thread2 = nullptr; //STD线程对象
+        std::unique_ptr<std::thread> m_thread; //Owned scan thread
+        std::unique_ptr<std::thread> m_thread2; //Owned secondary thread
         /// command locker（不支持嵌套）
         Locker _cmd_lock;
         /// driver error locker（不支持嵌套）
@@ -611,7 +613,7 @@ namespace ydlidar
         int m_intensityBit = 0;
 
         /// LiDAR Point pointer
-        node_info *scan_node_buf = nullptr;
+        std::unique_ptr<node_info[]> scan_node_buf;
         /// LiDAR scan count
         size_t scan_node_count = 0; //LiDAR Scan Count
         /// package sample index

@@ -32,6 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 #include <math.h>
+#include <system_error>
 #include <fstream>
 #include <algorithm>
 #include "GSLidarDriver.h"
@@ -80,8 +81,8 @@ GSLidarDriver::GSLidarDriver(uint8_t type)
     moduleNum           = 0;
 
     nodeIndex = 0;
-    globalRecvBuffer = new uint8_t[GSPACKSIZE];
-    scan_node_buf = new node_info[MAX_SCAN_NODES];
+    globalRecvBuffer.reset(new uint8_t[GSPACKSIZE]);
+    scan_node_buf.reset(new node_info[MAX_SCAN_NODES]);
     for (int i=0; i<LIDAR_MAXCOUNT; ++i)
     {
         k0[i] = 0;
@@ -102,17 +103,14 @@ GSLidarDriver::~GSLidarDriver()
             _comm->flush();
             _comm->closePort();
         }
-        delete _comm;
-        _comm = NULL;
+        _comm.reset();
     }
 
     if (globalRecvBuffer) {
-        delete[] globalRecvBuffer;
-        globalRecvBuffer = NULL;
+        globalRecvBuffer.reset();
     }
     if (scan_node_buf) {
-        delete[] scan_node_buf;
-        scan_node_buf = NULL;
+        scan_node_buf.reset();
     }
 }
 
@@ -126,12 +124,12 @@ result_t GSLidarDriver::connect(const char *port_path, uint32_t baudrate)
         {
             if (m_DeviceType == YDLIDAR_TYPE_TCP)
             {
-                _comm = new CActiveSocket();
+                _comm.reset(new CActiveSocket());
             }
             else
             {
-                _comm = new serial::Serial(m_port, m_baudrate,
-                    serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT));
+                _comm.reset(new serial::Serial(m_port, m_baudrate,
+                    serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT)));
             }
             _comm->bindport(port_path, baudrate);
         }
@@ -212,16 +210,13 @@ void GSLidarDriver::disconnect() {
 
 void GSLidarDriver::disableDataGrabbing()
 {
-    if (m_isScanning) {
-        m_isScanning = false;
-        _dataEvent.set();
-    }
+    m_isScanning = false;
+    _dataEvent.set();
     if (m_thread)
     {
         if (m_thread->joinable())
             m_thread->join();
-        delete m_thread;
-        m_thread = nullptr;
+        m_thread.reset();
     }
     // _thread.join();
 }
@@ -592,8 +587,6 @@ int GSLidarDriver::cacheScanData()
     retryCount = 0;
     lastStamp = 0;
 
-    m_isScanning = true;
-
   //打印帧间隔相关
 //   std::map<int, uint32_t> ts;
 //   for (int i=0; i<LIDAR_MAXCOUNT; ++i)
@@ -697,7 +690,7 @@ result_t GSLidarDriver::waitPackage(node_info *node, uint32_t timeout)
                 return ret;
             if (recvSize > remainSize)
                 recvSize = remainSize;
-            getData(globalRecvBuffer, recvSize);
+            getData(globalRecvBuffer.get(), recvSize);
 
 PARSEHEAD:
             for (size_t i = 0; i < recvSize; ++i)
@@ -796,7 +789,7 @@ PARSEHEAD:
                                 return ret;
                             if (recvSize > remainSize)
                                 recvSize = remainSize;
-                            getData(globalRecvBuffer, recvSize);
+                            getData(globalRecvBuffer.get(), recvSize);
                         }
 
                         for (size_t j = offset; j < recvSize; ++j)
@@ -1230,7 +1223,7 @@ result_t GSLidarDriver::ascendScanData(node_info *nodebuffer, size_t count) {
         pre_degree = degree;
     }
 
-    node_info *tmpbuffer = new node_info[count];
+    std::unique_ptr<node_info[]> tmpbuffer(new node_info[count]);
 
     for (i = (int)zero_pos; i < (int)count; i++) {
         tmpbuffer[i - zero_pos] = nodebuffer[i];
@@ -1240,8 +1233,7 @@ result_t GSLidarDriver::ascendScanData(node_info *nodebuffer, size_t count) {
         tmpbuffer[i + (int)count - zero_pos] = nodebuffer[i];
     }
 
-    memcpy(nodebuffer, tmpbuffer, count * sizeof(node_info));
-    delete[] tmpbuffer;
+    memcpy(nodebuffer, tmpbuffer.get(), count * sizeof(node_info));
 
     return RESULT_OK;
 }
@@ -1347,11 +1339,10 @@ void GSLidarDriver::setIntensities(const bool &isintensities)
 {
     if (m_intensities != isintensities) {
         if (globalRecvBuffer) {
-            delete[] globalRecvBuffer;
-            globalRecvBuffer = NULL;
+            globalRecvBuffer.reset();
         }
 
-        globalRecvBuffer = new uint8_t[GSPACKSIZE];
+        globalRecvBuffer.reset(new uint8_t[GSPACKSIZE]);
     }
 
     m_intensities = isintensities;
@@ -1447,10 +1438,15 @@ result_t GSLidarDriver::stopScan(uint32_t timeout)
 
 result_t GSLidarDriver::startThread()
 {
-    m_thread = new std::thread(&GSLidarDriver::cacheScanData, this);
-    if (!m_thread)
+    try
     {
-        error("Fail to create GS thread");
+        m_isScanning = true;
+        m_thread.reset(new std::thread(&GSLidarDriver::cacheScanData, this));
+    }
+    catch (const std::system_error &e)
+    {
+        m_isScanning = false;
+        error("Fail to create GS thread: %s", e.what());
         return RESULT_FAIL;
     }
 

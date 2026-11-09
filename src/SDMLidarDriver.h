@@ -50,6 +50,7 @@
 #define SDM_YDLIDAR_DRIVER_H
 
 #include <stdlib.h>
+#include <memory>
 #include <atomic>
 #include <map>
 #include "core/serial/serial.h"
@@ -437,7 +438,7 @@ public:
   virtual result_t getDeviceInfo(device_info &info, uint32_t timeout = DEFAULT_TIMEOUT);
 
 private:
-  serial::Serial *_serial = nullptr; //串口
+  std::unique_ptr<serial::Serial> _serial; //串口
   std::vector<uint8_t> recvBuff; //一包数据缓存
   device_health health_;
 };

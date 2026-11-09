@@ -1,0 +1,53 @@
+name: SDK build
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DBUILD_EXAMPLES=OFF
+          -DBUILD_TEST=OFF
+          -DBUILD_PYTHON=OFF
+          -DBUILD_SHARED_LIBS=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build SDK
+        run: cmake --build build --parallel 2
+
+  linux-examples:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Configure with examples
+        run: >
+          cmake -S . -B build-examples
+          -DBUILD_EXAMPLES=ON
+          -DBUILD_TEST=OFF
+          -DBUILD_SHARED_LIBS=OFF
+          -DBUILD_PYTHON=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build SDK and examples
+        run: cmake --build build-examples --parallel 2

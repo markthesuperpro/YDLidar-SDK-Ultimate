@@ -10,7 +10,7 @@ namespace ydlidar
 {
 
 DTSLidarDriver::DTSLidarDriver()
-    : _serial(NULL)
+    : _serial(nullptr)
 {
     //串口配置参数
     isAutoReconnect = true;
@@ -24,7 +24,7 @@ DTSLidarDriver::DTSLidarDriver()
     nodeIndex = 0;
     recvBuff = std::vector<uint8_t>(SDKDTSPCSSIZE, 0);
     scan_node_count = 0;
-    scan_node_buf = new node_info[SDK_DTS_POINT_COUNT * 5];
+    scan_node_buf.reset(new node_info[SDK_DTS_POINT_COUNT * 5]);
 }
 
 DTSLidarDriver::~DTSLidarDriver()
@@ -42,8 +42,7 @@ DTSLidarDriver::~DTSLidarDriver()
                 _serial->flush();
                 _serial->closePort();
             }
-            delete _serial;
-            _serial = NULL;
+            _serial.reset();
         }
     }
 
@@ -51,8 +50,7 @@ DTSLidarDriver::~DTSLidarDriver()
         ScopedLocker l(_lock);
         if (scan_node_buf)
         {
-            delete[] scan_node_buf;
-            scan_node_buf = NULL;
+            scan_node_buf.reset();
         }
         scan_node_count = 0;
     }
@@ -66,10 +64,10 @@ result_t DTSLidarDriver::connect(const char *port, uint32_t baudrate)
         ScopedLocker l(_cmd_lock);
         if (!_serial)
         {
-            _serial = new serial::Serial(
+            _serial.reset(new serial::Serial(
                 m_port,
                 m_baudrate,
-                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT));
+                serial::Timeout::simpleTimeout(DEFAULT_TIMEOUT)));
         }
         if (!_serial->open())
         {
@@ -165,7 +163,7 @@ result_t DTSLidarDriver::grabScanData(
     {
         ScopedLocker l(_lock);
         count = min(count, scan_node_count);
-        memcpy(nodebuffer, scan_node_buf, count * SDKNODESIZE);
+        memcpy(nodebuffer, scan_node_buf.get(), count * SDKNODESIZE);
         scan_node_count = 0;
         ret = RESULT_OK;
         _dataEvent.set(false); //重置状态
@@ -279,7 +277,7 @@ int DTSLidarDriver::cacheScanData()
             retryCount = 0;
 
             ScopedLocker l(_lock);
-            memcpy(scan_node_buf, local_buf, sizeof(node_info) * count);
+            memcpy(scan_node_buf.get(), local_buf, sizeof(node_info) * count);
             scan_node_count = count;
             _dataEvent.set();
         }
@@ -819,8 +817,7 @@ result_t DTSLidarDriver::checkAutoConnecting()
                 {
                     m_isConnected = false;
                     _serial->closePort();
-                    delete _serial;
-                    _serial = nullptr;
+                    _serial.reset();
                 }
             }
         }

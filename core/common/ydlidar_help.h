@@ -41,6 +41,10 @@
 *********************************************************************/
 #pragma once
 #include <sstream>
+#include <core/logger/logger.hpp>
+#include <vector>
+#include <cstdio>
+#include <cstdarg>
 #include <iomanip>
 #include <stdarg.h>
 #include "DriverInterface.h"
@@ -111,115 +115,66 @@ inline uint32_t calcCrc32(
     return crc;
 }
 
-//颜色定义
+// Colour constants remain available for existing SDK integrations.
 #ifndef COLOR
-    #define COLOFF  "\033[0m"      ///关闭所有属性
-    #define RED      "\033[0;31m"   ///"\033[显示方式;字体颜色;背景颜色m"
-    #define GREEN    "\033[0;32m"
-    #define YELLOW   "\033[0;33m"
-    #define BLUE     "\033[0;34m"
-    #define PURPLE   "\033[0;35m"
+    #define COLOFF  "\033[0m"
+    #define RED     "\033[0;31m"
+    #define GREEN   "\033[0;32m"
+    #define YELLOW  "\033[0;33m"
+    #define BLUE    "\033[0;34m"
+    #define PURPLE  "\033[0;35m"
 #endif
 
-//打印系统时间
-#define UNIX_PRINT_TIME  \
-  time_t currentTime = time(NULL); \
-  struct tm *localTime = localtime(&currentTime); \
-  printf("[%04d-%02d-%02d %02d:%02d:%02d]", \
-    (1900 + localTime->tm_year), \
-    (1 + localTime->tm_mon), \
-    localTime->tm_mday, \
-    localTime->tm_hour, \
-    localTime->tm_min, \
-    localTime->tm_sec);
-#define WIN_PRINT_TIME UNIX_PRINT_TIME
-#ifdef _WIN32
-  #define PRINT_TIME WIN_PRINT_TIME
-#else
-  #define PRINT_TIME UNIX_PRINT_TIME
-#endif
-//格式化字符串
-#define FORMAT_STDOUT \
-  char buff[1024] = {0}; \
-  va_list ap; \
-  va_start(ap, fmt); \
-  vsprintf(buff, fmt, ap); \
-  va_end(ap); \
-  printf(buff); \
-  printf("\n");
-
-//调试
-inline void debug(char* fmt, ...)
-{
-  printf(GREEN); //设置绿色
-  PRINT_TIME
-  printf("[debug] ");
-  FORMAT_STDOUT
-  printf(COLOFF); //恢复默认颜色
-  fflush(stdout);
+inline ydlidar::core::Log::Logger &sdkLogger() {
+    static ydlidar::core::Log::Logger logger("YDLIDAR", ydlidar::core::Log::DEBUG);
+    return logger;
 }
-
-//常规
-inline void info(char* fmt, ...)
-{
-  PRINT_TIME
-  printf("[info] ");
-  FORMAT_STDOUT
-  fflush(stdout);
+inline std::string formatLogMessage(const char *format, va_list arguments) {
+    if (!format) return std::string();
+    va_list copy;
+    va_copy(copy, arguments);
+    const int required = std::vsnprintf(nullptr, 0, format, copy);
+    va_end(copy);
+    if (required < 0) return std::string("log formatting failed");
+    std::vector<char> buffer(static_cast<std::size_t>(required) + 1);
+    std::vsnprintf(buffer.data(), buffer.size(), format, arguments);
+    return std::string(buffer.data(), static_cast<std::size_t>(required));
 }
-
-//警告
-inline void warn(char* fmt, ...)
-{
-  printf(YELLOW); //设置黄色
-  PRINT_TIME
-  printf("[warn] ");
-  FORMAT_STDOUT
-  printf(COLOFF); //恢复默认颜色
-  fflush(stdout);
+inline void debug(const char *format, ...) {
+    va_list args; va_start(args, format);
+    const std::string message = formatLogMessage(format, args);
+    va_end(args); sdkLogger().debug(message);
 }
-
-//错误
-inline void error(char* fmt, ...)
-{
-  printf(RED); //设置红色
-  PRINT_TIME
-  printf("[error] ");
-  FORMAT_STDOUT
-  printf(COLOFF); //恢复默认颜色
-  fflush(stdout);
+inline void info(const char *format, ...) {
+    va_list args; va_start(args, format);
+    const std::string message = formatLogMessage(format, args);
+    va_end(args); sdkLogger().info(message);
 }
-
-//调试（16进制）
-inline void debugh(const uint8_t *data, int size, const char* prefix=NULL)
-{
-  if (!data || !size)
-    return;
-  printf(GREEN); //设置绿色
-  PRINT_TIME
-  printf("[debug] ");
-  if (prefix)
-      printf(prefix);
-  for (int i=0; i<size; ++i)
-      printf("%02X", data[i]);
-  printf("\n");
-  printf(COLOFF); //恢复默认颜色
-  fflush(stdout);
+inline void warn(const char *format, ...) {
+    va_list args; va_start(args, format);
+    const std::string message = formatLogMessage(format, args);
+    va_end(args); sdkLogger().warning(message);
 }
-
-//常规（16进制）
-inline void infoh(const uint8_t *data, int size, const char* prefix=NULL)
-{
-  if (!data || !size)
-      return;
-  PRINT_TIME
-  printf("[info] ");
-  if (prefix)
-      printf(prefix);
-  for (int i=0; i<size; ++i)
-      printf("%02X", data[i]);
-  printf("\n");
-  fflush(stdout);
+inline void error(const char *format, ...) {
+    va_list args; va_start(args, format);
+    const std::string message = formatLogMessage(format, args);
+    va_end(args); sdkLogger().error(message);
+}
+inline void debugh(const uint8_t *data, int size, const char *prefix = nullptr) {
+    if (!data || size <= 0) return;
+    std::ostringstream output;
+    if (prefix) output << prefix;
+    output << std::hex << std::uppercase << std::setfill('0');
+    for (int i = 0; i < size; ++i) output << std::setw(2) << static_cast<unsigned>(data[i]);
+    sdkLogger().debug(output.str());
+}
+inline void infoh(const uint8_t *data, int size, const char *prefix = nullptr) {
+    if (!data || size <= 0) return;
+    std::ostringstream output;
+    if (prefix) output << prefix;
+    output << std::hex << std::uppercase << std::setfill('0');
+    for (int i = 0; i < size; ++i) output << std::setw(2) << static_cast<unsigned>(data[i]);
+    sdkLogger().info(output.str());
 }
 
 /*!

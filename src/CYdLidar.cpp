@@ -22,6 +22,7 @@
 // SOFTWARE.
 //
 #include <map>
+#include <fmt/format.h>
 #include <numeric>
 #include <algorithm>
 #include <math.h>
@@ -75,7 +76,7 @@ CYdLidar::CYdLidar() : lidarPtr(nullptr)
   m_Intensity = false;
   m_IntensityBit = 10;
   last_node_time = getTime();
-  global_nodes = new node_info[DriverInterface::MAX_SCAN_NODES];
+  global_nodes.reset(new node_info[DriverInterface::MAX_SCAN_NODES]);
   last_frequency = 0;
   m_FristNodeTime = getTime();
   m_AllNode = 0;
@@ -91,11 +92,7 @@ CYdLidar::CYdLidar() : lidarPtr(nullptr)
 CYdLidar::~CYdLidar()
 {
   disconnecting();
-  if (global_nodes)
-  {
-    delete[] global_nodes;
-    global_nodes = NULL;
-  }
+  global_nodes.reset();
 }
 
 bool CYdLidar::setlidaropt(int optname, const void *optval, int optlen)
@@ -418,7 +415,7 @@ bool CYdLidar::initialize()
             m_SerialPort.c_str(), m_SerialBaudrate);
     return false;
   }
-  info("Lidar init success, elapsed time [%u]ms", getms() - t);
+  sdkLogger().info(fmt::format("Lidar init success, elapsed time [{}] ms", getms() - t));
   return true;
 }
 
@@ -520,7 +517,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
   uint64_t tim_scan_start = getTime();
   uint64_t startTs = tim_scan_start;
   //从缓存中获取已采集的一圈扫描数据
-  result_t op_result = lidarPtr->grabScanData(global_nodes, count, 1000);
+  result_t op_result = lidarPtr->grabScanData(global_nodes.get(), count, 1000);
   uint64_t tim_scan_end = getTime();
   uint64_t endTs = tim_scan_end;
   uint64_t sys_scan_time = tim_scan_end - tim_scan_start; //获取一圈数据所花费的时间
@@ -766,7 +763,7 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
       if (outscan.points.size() > all_node_count)
       {
         //如果点过多则直接删除多余的点并打印警告
-        warn("[YDLIDAR]: Real points %lu > fixed points %d", count, all_node_count);
+        sdkLogger().warning(fmt::format("[YDLIDAR] Real points {} > fixed points {}", outscan.points.size(), all_node_count));
       	outscan.points.resize(all_node_count);
       }
       else if (outscan.points.size() < all_node_count && !outscan.points.empty())
@@ -786,9 +783,8 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
   }
   else
   {
-    error("[YDLIDAR]: %d %s\n",
-      op_result,
-      DriverInterface::DescribeDriverError(lidarPtr->getDriverError()));
+    sdkLogger().error(fmt::format("YDLIDAR driver error {}: {}", op_result,
+        DriverInterface::DescribeDriverError(lidarPtr->getDriverError())));
 
     m_AllNode = 0;
     m_FristNodeTime = tim_scan_start;
@@ -878,7 +874,7 @@ bool CYdLidar::getUserVersion(std::string &version)
     }
 
     size_t count = ydlidar::YDlidarDriver::MAX_SCAN_NODES;
-    result_t op_result = lidarPtr->grabScanData(global_nodes, count);
+    result_t op_result = lidarPtr->grabScanData(global_nodes.get(), count);
     if (IS_OK(op_result) && count > 2)
     {
         uint8_t userVerion = global_nodes[USERVERSIONNDEX].debugInfo;
@@ -1065,7 +1061,7 @@ bool CYdLidar::checkLidarAbnormal()
       checkOneCount ++;
       start_time = getTime();
       count = ydlidar::YDlidarDriver::MAX_SCAN_NODES;
-      ret = lidarPtr->grabScanData(global_nodes, count);
+      ret = lidarPtr->grabScanData(global_nodes.get(), count);
       end_time = getTime();
       scan_time = 1.0 * static_cast<int64_t>(end_time - start_time) / 1e9;
       
@@ -1626,8 +1622,7 @@ bool CYdLidar::checkConnect()
   if (lidarPtr && 
     lidarPtr->getLidarType() != m_LidarType)
   {
-    delete lidarPtr;
-    lidarPtr = nullptr;
+    lidarPtr.reset();
   }
   //如果未创建对象
   if (!lidarPtr)
@@ -1636,17 +1631,17 @@ bool CYdLidar::checkConnect()
 
     //根据雷达类型创建对应的实例
     if (isNetTOFLidar(m_LidarType))
-      lidarPtr = new ydlidar::ETLidarDriver(); //T15
+      lidarPtr.reset(new ydlidar::ETLidarDriver()); //T15
     else if (isGSLidar(m_LidarType)) //GS
-      lidarPtr = new ydlidar::GSLidarDriver(m_DeviceType);
+      lidarPtr.reset(new ydlidar::GSLidarDriver(m_DeviceType));
     else if (isSDMLidar(m_LidarType)) //SDM
-      lidarPtr = new ydlidar::SDMLidarDriver();
+      lidarPtr.reset(new ydlidar::SDMLidarDriver());
     else if (isDTSLidar(m_LidarType)) //SDM
-      lidarPtr = new ydlidar::DTSLidarDriver();
+      lidarPtr.reset(new ydlidar::DTSLidarDriver());
     else if (isTIALidar(m_LidarType))
-      lidarPtr = new ydlidar::TiaLidarDriver();
+      lidarPtr.reset(new ydlidar::TiaLidarDriver());
     else //通用雷达
-      lidarPtr = new ydlidar::YDlidarDriver(m_DeviceType);
+      lidarPtr.reset(new ydlidar::YDlidarDriver(m_DeviceType));
 
     if (!lidarPtr)
     {

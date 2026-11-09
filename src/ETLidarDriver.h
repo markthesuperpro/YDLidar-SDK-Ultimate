@@ -44,6 +44,7 @@
 
 /* Header file to enable threading and ergo callback */
 #include <core/base/thread.h>
+#include <memory>
 #include <core/base/locker.h>
 #include <vector>
 #include <core/common/ydlidar_protocol.h>
@@ -443,8 +444,8 @@ class ETLidarDriver : public DriverInterface {
   int                       port;
   int                       m_sampleRate;
   /* Sockets for ydlidar */
-  core::network::CActiveSocket             *socket_cmd;
-  core::network::CPassiveSocket            *socket_data;
+  std::unique_ptr<core::network::CActiveSocket> socket_cmd;
+  std::unique_ptr<core::network::CPassiveSocket> socket_data;
   dataFrame                 frame;
   const char               *configValue[2] = {"0", "1"};
   bool m_isValidDevice;

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <memory>
 #include <math.h>
 #include "core/base/thread.h"
 #include "core/base/locker.h"
@@ -241,8 +242,8 @@ private:
     float m_lastAngle = 0.f;
     int m_port2 = 9000;
     /* Sockets for ydlidar */
-    CActiveSocket *socket_cmd = nullptr;
-    CPassiveSocket *socket_data = nullptr;
+    std::unique_ptr<CActiveSocket> socket_cmd;
+    std::unique_ptr<CPassiveSocket> socket_data;
     uint8_t m_buff[TIA_PACKMAXBUFFS2]; //缓存
     uint64_t lastZeroTime = 0; //上一零位点时间
     uint8_t lastPackIndex = 0; //上一包包序号

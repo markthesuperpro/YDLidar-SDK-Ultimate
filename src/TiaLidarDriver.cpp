@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <system_error>
 #include <errno.h>
 #include <algorithm>
 #include "core/network/PassiveSocket.h"
@@ -26,12 +27,12 @@ using namespace ydlidar::core::common;
 
 TiaLidarDriver::TiaLidarDriver()
 {
-    socket_cmd = new core::network::CActiveSocket(CSimpleSocket::SocketTypeTcp);
-    socket_data = new core::network::CPassiveSocket(CSimpleSocket::SocketTypeUdp);
+    socket_cmd.reset(new core::network::CActiveSocket(CSimpleSocket::SocketTypeTcp));
+    socket_data.reset(new core::network::CPassiveSocket(CSimpleSocket::SocketTypeUdp));
     socket_data->SetSocketType(CSimpleSocket::SocketTypeUdp);
     socket_cmd->SetConnectTimeout(DEFAULT_CONNECTION_TIMEOUT_SEC,
                                   DEFAULT_CONNECTION_TIMEOUT_USEC);
-    scan_node_buf = new node_info[LIDAR_MAXNODES];
+    scan_node_buf.reset(new node_info[LIDAR_MAXNODES]);
     scan_node_count = 0;
     nodeIndex = 0;
     retryCount = 0;
@@ -55,18 +56,15 @@ TiaLidarDriver::~TiaLidarDriver()
 
     ScopedLocker l2(_lock2);
     if (socket_data) {
-        delete socket_data;
-        socket_data = NULL;
+        socket_data.reset();
     }
     ScopedLocker l(_lock);
     if (socket_cmd) {
-        delete socket_cmd;
-        socket_cmd = NULL;
+        socket_cmd.reset();
     }
 
     if (scan_node_buf) {
-        delete[] scan_node_buf;
-        scan_node_buf = nullptr;
+        scan_node_buf.reset();
     }
 }
 
@@ -125,12 +123,12 @@ const char *TiaLidarDriver::DescribeError(bool isTCP)
     if (isTCP)
     {
         ScopedLocker lock(_lock);
-        return socket_cmd != NULL ? socket_cmd->DescribeError() : "NO Socket";
+        return socket_cmd != nullptr ? socket_cmd->DescribeError() : "NO Socket";
     }
     else
     {
         ScopedLocker lock(_lock2);
-        return socket_data != NULL ? socket_data->DescribeError() : "NO Socket";
+        return socket_data != nullptr ? socket_data->DescribeError() : "NO Socket";
     }
 }
 
@@ -269,10 +267,15 @@ result_t TiaLidarDriver::getDeviceInfo(device_info &di, uint32_t timeout)
 
 bool TiaLidarDriver::startThread()
 {
-    m_thread = new std::thread(&TiaLidarDriver::parseScanDataThread, this);
-    if (!m_thread)
+    try
     {
-      error("Fail to create data thread");
+      m_isScanning = true;
+      m_thread.reset(new std::thread(&TiaLidarDriver::parseScanDataThread, this));
+    }
+    catch (const std::system_error &e)
+    {
+      m_isScanning = false;
+      error("Fail to create data thread: %s", e.what());
       return false;
     }
     info("Create TIA thread 0x%X", m_thread->get_id());
@@ -386,15 +389,13 @@ void TiaLidarDriver::deleteThread()
     {
       if (m_thread->joinable())
         m_thread->join();
-      delete m_thread;
-      m_thread = nullptr;
+      m_thread.reset();
     }
     if (m_thread2)
     {
       if (m_thread2->joinable())
         m_thread2->join();
-      delete m_thread2;
-      m_thread2 = nullptr;
+      m_thread2.reset();
     }
 }
 
@@ -420,7 +421,7 @@ result_t TiaLidarDriver::grabScanData(
         {
             ScopedLocker l(_lock);
             size_t size_to_copy = std::min(count, scan_node_count);
-            memcpy(nodebuffer, scan_node_buf, size_to_copy * sizeof(node_info));
+            memcpy(nodebuffer, scan_node_buf.get(), size_to_copy * sizeof(node_info));
             count = size_to_copy;
             scan_node_count = 0;
             ret = RESULT_OK;
@@ -530,8 +531,6 @@ int TiaLidarDriver::parseScanDataThread()
     lastZeroTime = getms();
     lastPackIndex = 0;
 
-    m_isScanning = true;
-
     while (m_isScanning)
     {
         count = 0;
@@ -576,7 +575,7 @@ int TiaLidarDriver::parseScanDataThread()
                 {
                     {
                         ScopedLocker l(_lock);
-                        memcpy(scan_node_buf, local_scan, scan_count * SDKNODESIZE);
+                        memcpy(scan_node_buf.get(), local_scan, scan_count * SDKNODESIZE);
                         scan_node_count = scan_count;
                         _dataEvent.set();
                     }

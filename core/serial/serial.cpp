@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <utility>
 
 #if !defined(_WIN32) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
 # include <alloca.h>
@@ -29,7 +30,7 @@ using serial::flowcontrol_t;
 
 class Serial::ScopedReadLock {
  public:
-  explicit ScopedReadLock(Serial::SerialImpl *pimpl) : pimpl_(pimpl) {
+  explicit ScopedReadLock(std::shared_ptr<Serial::SerialImpl> pimpl) : pimpl_(std::move(pimpl)) {
     this->pimpl_->readLock();
   }
   ~ScopedReadLock() {
@@ -40,12 +41,12 @@ class Serial::ScopedReadLock {
   ScopedReadLock(const ScopedReadLock &);
   const ScopedReadLock &operator=(ScopedReadLock);
 
-  Serial::SerialImpl *pimpl_;
+  std::shared_ptr<Serial::SerialImpl> pimpl_;
 };
 
 class Serial::ScopedWriteLock {
  public:
-  explicit ScopedWriteLock(Serial::SerialImpl *pimpl) : pimpl_(pimpl) {
+  explicit ScopedWriteLock(std::shared_ptr<Serial::SerialImpl> pimpl) : pimpl_(std::move(pimpl)) {
     this->pimpl_->writeLock();
   }
   ~ScopedWriteLock() {
@@ -55,20 +56,18 @@ class Serial::ScopedWriteLock {
   // Disable copy constructors
   ScopedWriteLock(const ScopedWriteLock &);
   const ScopedWriteLock &operator=(ScopedWriteLock);
-  Serial::SerialImpl *pimpl_;
+  std::shared_ptr<Serial::SerialImpl> pimpl_;
 };
 
 Serial::Serial(const string &port, uint32_t baudrate, serial::Timeout timeout,
                bytesize_t bytesize, parity_t parity, stopbits_t stopbits,
                flowcontrol_t flowcontrol)
-  : pimpl_(new SerialImpl(port, baudrate, bytesize, parity,
+  : pimpl_(std::make_shared<SerialImpl>(port, baudrate, bytesize, parity,
                           stopbits, flowcontrol)) {
   pimpl_->setTimeout(timeout);
 }
 
-Serial::~Serial() {
-  delete pimpl_;
-}
+Serial::~Serial() = default;
 
 bool Serial::open() {
   return pimpl_->open();

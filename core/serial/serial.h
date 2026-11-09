@@ -2,6 +2,7 @@
 #define SERIAL_H
 
 #include <limits>
+#include <memory>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -654,7 +655,7 @@ class Serial : public ChannelDevice {
 
   // Pimpl idiom, d_pointer
   class SerialImpl;
-  SerialImpl *pimpl_;
+  std::shared_ptr<SerialImpl> pimpl_;
   SerialPortError m_serialErrno;       /// number of last error
 
 

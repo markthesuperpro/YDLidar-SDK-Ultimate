@@ -1,8 +1,6 @@
 #cmake_policy(SET CMP0078 NEW)
 #cmake_policy(SET CMP0086 OLD)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-add_definitions(-std=c++11) # Use C++11
 
 #Include directories
 INCLUDE_DIRECTORIES(
@@ -51,5 +49,12 @@ execute_process(COMMAND "${PYTHON_EXECUTABLE}" -c "if True:
                 OUTPUT_VARIABLE PYTHON_SITE
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 # Install the wrapper.
-install(TARGETS _${MODULE_NAME} DESTINATION ${PYTHON_SITE})
+if(TARGET _${MODULE_NAME})
+    set(PYTHON_EXTENSION_TARGET _${MODULE_NAME})
+elseif(TARGET ${MODULE_NAME})
+    set(PYTHON_EXTENSION_TARGET ${MODULE_NAME})
+else()
+    message(FATAL_ERROR "SWIG did not create the Python extension target for ${MODULE_NAME}")
+endif()
+install(TARGETS ${PYTHON_EXTENSION_TARGET} DESTINATION ${PYTHON_SITE})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${MODULE_NAME}.py" DESTINATION ${PYTHON_SITE})

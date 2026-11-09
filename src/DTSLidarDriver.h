@@ -1,6 +1,7 @@
 #ifndef DTSLIDARDRIVER_H
 #define DTSLIDARDRIVER_H
 #include <stdlib.h>
+#include <memory>
 #include <atomic>
 #include <map>
 #include "core/serial/serial.h"
@@ -199,7 +200,7 @@ public:
     uint16_t calculateCrc(const vector<uint8_t>& data);
 
 private:
-    serial::Serial *_serial = nullptr; //串口
+    std::unique_ptr<serial::Serial> _serial; //串口
     std::vector<uint8_t> recvBuff; //一包数据缓存
     float k = 0; //校准参数k
     float b = 0; //校准参数b

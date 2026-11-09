@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <math.h>
 #include "NoiseFilter.h"
 #include "math/angles.h"
@@ -309,23 +310,19 @@ void NoiseFilter::filter_tail(
                 if (incline < minIncline || incline > maxIncline)
                 {
                     //mask neighbour points
-                    for (int j = -maskedNeighbours; j < maskedNeighbours; j++)
+                    for (int j = -maskedNeighbours; j < maskedNeighbours; ++j)
                     {
-                        if ((int(i) + j < 0)
-                                || ((int(i) + j) > size)) {
+                        const std::ptrdiff_t neighbor = static_cast<std::ptrdiff_t>(i) + j;
+                        // The target-offset calculation reads neighbor-1 and neighbor.
+                        if (neighbor <= 0 || static_cast<std::size_t>(neighbor) >= size)
                             continue;
-                        }
-                        if (i + j - 1 < 0) {
-                            continue;
-                        }
 
-                        //如果当前点相邻N点中有偏移量较大的点则认为是噪点
-                        double offset = calcTargetOffset(in.points[i + j - 1].range,
-                                in.points[i + j - 1].angle,
-                                in.points[i + j].range,
-                                in.points[i + j].angle); //calculate offset distance
+                        const std::size_t current = static_cast<std::size_t>(neighbor);
+                        const double offset = calcTargetOffset(
+                            in.points[current - 1].range, in.points[current - 1].angle,
+                            in.points[current].range, in.points[current].angle);
                         if (offset < 0.2) {
-                            maskedPoints[i + j] = true;
+                            maskedPoints[current] = true;
                             isValid = true;
                         }
                     }
@@ -528,7 +525,7 @@ void NoiseFilter::filter_tail2(
                         size_t validCount = 0;
                         for (size_t j=pos; j<=i; ++j)
                         {
-                            if (isRangeValid(in.config, in.points[i % size].range))
+                            if (isRangeValid(in.config, in.points[j % size].range))
                                 validCount += 1;
                         }
                         if (validCount >= MIN_NOISEPOINT_COUNT)
@@ -571,7 +568,7 @@ void NoiseFilter::filter_tail2(
             noiseCount ++;
         }
     }
-    printf("Noise count %lu\n", noiseCount);
+    printf("Noise count %zu\n", noiseCount);
 }
 
 void NoiseFilter::setStrategy(int value)
