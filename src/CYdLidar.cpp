@@ -1277,6 +1277,7 @@ bool CYdLidar::getDeviceInfo()
   if (!IS_OK(op_result))
   {
     error("Fail to get baseplate device information!");
+	fflush(stdout);
     return false;
   }
 
@@ -1412,6 +1413,7 @@ void CYdLidar::handleSingleChannelDevice()
   result_t op_result = lidarPtr->getDeviceInfo(di);
   if (!IS_OK(op_result))
   {
+	fflush(stdout);
     return;
   }
 
