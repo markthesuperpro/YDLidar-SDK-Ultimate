@@ -763,18 +763,17 @@ bool CYdLidar::doProcessSimple(LaserScan &outscan)
 
     if (m_FixedResolution)
     {
-      if (count > all_node_count)
+      if (outscan.points.size() > all_node_count)
       {
         //如果点过多则直接删除多余的点并打印警告
         warn("[YDLIDAR]: Real points %lu > fixed points %d", count, all_node_count);
       	outscan.points.resize(all_node_count);
       }
-      else
+      else if (outscan.points.size() < all_node_count && !outscan.points.empty())
       {
         //如果点过少则添加末点
         LaserPoint p = outscan.points.back();
-	      while (outscan.points.size() < all_node_count)
-          outscan.points.push_back(p);
+	    outscan.points.resize(all_node_count, p);
       }
     }
 
