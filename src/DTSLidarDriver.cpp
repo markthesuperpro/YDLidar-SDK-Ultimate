@@ -10,7 +10,7 @@ namespace ydlidar
 {
 
 DTSLidarDriver::DTSLidarDriver()
-    : _serial(NULL)
+    : _serial(nullptr)
 {
     //串口配置参数
     isAutoReconnect = true;
