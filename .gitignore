@@ -31,6 +31,7 @@
 # IDE
 .vscode/*
 CMakeLists.txt.*
+build/
 build/cmake_install.cmake
 build/cmake_uninstall.cmake
 build/CMakeCache.txt
