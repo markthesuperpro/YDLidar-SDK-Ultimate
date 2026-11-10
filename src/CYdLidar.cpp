@@ -1306,11 +1306,18 @@ bool CYdLidar::getDeviceInfo(bool configure_hardware)
 
   if (info_type == EPT_None)
   {
-    warn("Device information is not available yet (bottom priority: %s, "
-         "single channel: %s). Continuing; module information will be used "
-         "when it becomes available.",
-         m_Bottom ? "true" : "false",
-         m_SingleChannel ? "true" : "false");
+    if (m_SingleChannel)
+    {
+      warn("No module device information is available before scanning. "
+           "This is expected for single-channel LiDARs; continuing with "
+           "the configured scan protocol.");
+    }
+    else
+    {
+      warn("Device information is not available yet (baseplate priority: %s). "
+           "Continuing without device metadata.",
+           m_Bottom ? "true" : "false");
+    }
     return false;
   }
 
