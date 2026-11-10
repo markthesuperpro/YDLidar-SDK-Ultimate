@@ -216,8 +216,9 @@ int main(int argc, char *argv[])
   optval = YDLIDAR_TYPE_SERIAL;
   laser.setlidaropt(LidarPropDeviceType, &optval, sizeof(int));
   /// sample rate
+  // X3/X3 Pro: select one-way communication above; the dataset specifies 3K.
+  // Keep the existing 4K example default for two-channel devices.
   optval = isSingleChannel ? 3 : 4;
-  optval = 5;
   laser.setlidaropt(LidarPropSampleRate, &optval, sizeof(int));
   /// abnormal count
   optval = 4;
