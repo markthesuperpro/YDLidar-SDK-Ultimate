@@ -457,6 +457,15 @@ bool CYdLidar::turnOn()
   }
   info("Successed to start the lidar, elapsed time %u ms", getms() - t);
 
+  // Dual-channel devices may publish module information only in the scan
+  // startup response. Apply cached identity before sample-rate validation.
+  device_info cached_info;
+  if (lidarPtr->getDeviceInfoEx(cached_info, EPT_Base) ||
+      lidarPtr->getDeviceInfoEx(cached_info, EPT_Module))
+  {
+    getDeviceInfo(false);
+  }
+
   t = getms();
   //计算采样率
   if (!checkLidarAbnormal())
@@ -1259,7 +1268,7 @@ bool CYdLidar::getHealthInfo()
   }
 }
 
-bool CYdLidar::getDeviceInfo()
+bool CYdLidar::getDeviceInfo(bool configure_hardware)
 {
   if (!lidarPtr)
     return false;
@@ -1267,12 +1276,41 @@ bool CYdLidar::getDeviceInfo()
   bool ret = false;
   device_info di;
   memset(&di, 0, sizeof(device_info));
-  result_t op_result = lidarPtr->getDeviceInfo(di,
-    DriverInterface::DEFAULT_TIMEOUT / 2);
-  if (!IS_OK(op_result))
+
+  // Metadata may not be available during initialize(). Prefer cached
+  // information first so we never issue a serial query while the scan
+  // thread is already consuming the same stream.
+  int info_type = EPT_None;
+  if (m_Bottom && lidarPtr->getDeviceInfoEx(di, EPT_Base))
   {
-    error("Fail to get baseplate device information!");
-	fflush(stdout);
+    info_type = EPT_Base;
+  }
+  else if (lidarPtr->getDeviceInfoEx(di, EPT_Module))
+  {
+    info_type = EPT_Module;
+  }
+  else if (!m_Bottom && lidarPtr->getDeviceInfoEx(di, EPT_Base))
+  {
+    info_type = EPT_Base;
+  }
+  else if (m_Bottom)
+  {
+    // Only the pre-scan status check should actively query the baseplate.
+    result_t op_result = lidarPtr->getDeviceInfo(
+      di, DriverInterface::DEFAULT_TIMEOUT / 2);
+    if (IS_OK(op_result))
+      info_type = EPT_Base;
+    else if (lidarPtr->getDeviceInfoEx(di, EPT_Module))
+      info_type = EPT_Module;
+  }
+
+  if (info_type == EPT_None)
+  {
+    warn("Device information is not available yet (bottom priority: %s, "
+         "single channel: %s). Continuing; module information will be used "
+         "when it becomes available.",
+         m_Bottom ? "true" : "false",
+         m_SingleChannel ? "true" : "false");
     return false;
   }
 
@@ -1293,17 +1331,12 @@ bool CYdLidar::getDeviceInfo()
       lidarPtr->setLidarType(m_LidarType);
     }
   }
-  else
+  else if (!isNetTOFLidarByModel(di.model) && isTOFLidar(m_LidarType))
   {
-    // if (!isTriangleLidar(m_LidarType) &&
-    //     !isNetTOFLidarByModel(devinfo.model) &&
-    //     !m_SingleChannel)
-    // {
-    //   error("Incorrect Lidar Type setting, Reset Type to %d...\n",
-    //           TYPE_TRIANGLE);
-    //   m_LidarType = TYPE_TRIANGLE;
-    //   lidarPtr->setLidarType(m_LidarType);
-    // }
+    warn("Detected a Triangle LiDAR model; correcting configured LiDAR type "
+         "from TOF to Triangle.");
+    m_LidarType = TYPE_TRIANGLE;
+    lidarPtr->setLidarType(m_LidarType);
   }
 
   frequencyOffset = 0.4;
@@ -1320,7 +1353,7 @@ bool CYdLidar::getDeviceInfo()
   std::string serial_number;
   ret = true;
 
-  if (printfDeviceInfo(di, EPT_Base))
+  if (printfDeviceInfo(di, info_type))
   {
     Major = (uint8_t)(di.firmware_version >> 8);
     Minjor = (uint8_t)(di.firmware_version & 0xff);
@@ -1351,39 +1384,35 @@ bool CYdLidar::getDeviceInfo()
   // uint32_t t = getms();
   if (hasSampleRate(di.model))
   {
-    checkSampleRate();
+    if (configure_hardware)
+      checkSampleRate();
   }
-  else
+  else if (defalutSampleRate.size())
   {
-    if (defalutSampleRate.size())
+    m_PointTime = 1e9 / (defalutSampleRate.front() * 1000);
+    lidarPtr->setPointTime(m_PointTime);
+  }
+
+  // These operations send commands over the serial connection. Do not run
+  // them from the cached post-start metadata path while scan data is read.
+  if (configure_hardware)
+  {
+    if (hasScanFrequencyCtrl(di.model) ||
+        ((isTOFLidar(m_LidarType)) && !m_SingleChannel) ||
+        isNetTOFLidar(m_LidarType))
     {
-      m_PointTime = 1e9 / (defalutSampleRate.front() * 1000);
-      lidarPtr->setPointTime(m_PointTime);
+      checkScanFrequency();
     }
-  }
 
-  // printf("LIDAR get device info finished, Elapsed time %u ms\n", getms() - t);
-  //检查转速
-  if (hasScanFrequencyCtrl(di.model) || 
-    ((isTOFLidar(m_LidarType)) && !m_SingleChannel) || 
-      isNetTOFLidar(m_LidarType))
-  {
-    checkScanFrequency();
-  }
-
-  if (isSupportHeartBeat(di.model))
-  {
-    ret &= checkHeartBeat();
-
-    if (!ret)
+    if (isSupportHeartBeat(di.model))
     {
-      fprintf(stderr, "Failed to Set HeartBeat[%d].\n", m_SupportHearBeat);
+      ret &= checkHeartBeat();
+      if (!ret)
+        fprintf(stderr, "Failed to Set HeartBeat[%d].\n", m_SupportHearBeat);
     }
-  }
 
-  if (hasZeroAngle(di.model))
-  {
-    ret &= checkZeroAngle(serial_number);
+    if (hasZeroAngle(di.model))
+      ret &= checkZeroAngle(serial_number);
   }
 
   return ret;

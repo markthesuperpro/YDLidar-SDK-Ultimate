@@ -505,9 +505,29 @@ result_t YDlidarDriver::waitDevicePackage(uint32_t timeout)
     return ret;
   device_info di;
   memcpy(reinterpret_cast<uint8_t*>(&di), d.data(), DEVICEINFOSIZE);
-  // 没有启用底板时才使用模组的雷达型号码
-  if (!m_Bottom)
-      model = di.model;
+  // Prefer baseplate information when it was actually received. If it was
+  // unavailable, the module packet is the only reliable model identifier.
+  if (!(m_HasDeviceInfo & EPT_Base))
+  {
+    model = di.model;
+
+    // Correct the generic serial parser before its worker thread is started.
+    // Network-specific driver selections are intentionally left untouched.
+    if (isTOFLidarByModel(model) && isTriangleLidar(m_LidarType))
+    {
+      warn("Detected a TOF LiDAR model in the module packet; switching the "
+           "generic scan parser to TYPE_TOF.");
+      m_LidarType = TYPE_TOF;
+    }
+    else if (!isTOFLidarByModel(model) &&
+             !isNetTOFLidarByModel(model) &&
+             isTOFLidar(m_LidarType))
+    {
+      warn("Detected a Triangle LiDAR model in the module packet; switching "
+           "the generic scan parser to TYPE_TRIANGLE.");
+      m_LidarType = TYPE_TRIANGLE;
+    }
+  }
   m_HasDeviceInfo |= EPT_Module;
   m_ModuleDevInfo = di;
   printfDeviceInfo(di, EPT_Module);
@@ -556,7 +576,7 @@ result_t YDlidarDriver::parseData(uint32_t timeout)
   {
     std::vector<uint8_t> d = readAll(timeout - dt);
     if (d.empty())
-      return ret;
+      break;
     m_data.insert(m_data.end(), d.begin(), d.end());
     size_t size = m_data.size();
     for (size_t i = 0; i < size; ++i)
@@ -745,10 +765,31 @@ result_t YDlidarDriver::parseData(uint32_t timeout)
     else
       m_data.clear();
   }
-  else if (m_data.size() > SDK_SIZE1K) //数据量过大时清空
+  else if (m_data.size() > SDK_SIZE1K) //数据量过大时重新同步
   {
-    warn("Current invalid data %u too big, has cleared", m_data.size());
+    const size_t invalid_size = m_data.size();
+    const size_t preview_size = std::min(invalid_size, size_t(16));
+    std::string prefix;
+    for (size_t index = 0; index < preview_size; ++index)
+    {
+      if (index)
+        prefix += ' ';
+      prefix += fmt::format("{:02X}",
+        static_cast<unsigned int>(m_data[index]));
+    }
+
+    // A packet header may be split across two serial reads. Keep a trailing
+    // PH1 so the next read can still complete an AA55/AA66 header.
+    const bool keep_sync = !m_data.empty() && m_data.back() == PH1;
     m_data.clear();
+    if (keep_sync)
+      m_data.push_back(PH1);
+
+    warn("Discarded %zu bytes without a valid scan packet "
+         "(port=%s, baudrate=%u, lidar_type=%d, single_channel=%s, "
+         "prefix=%s). Check the model-specific baudrate and lidar type.",
+         invalid_size, m_port.c_str(), m_baudrate, m_LidarType,
+         m_SingleChannel ? "true" : "false", prefix.c_str());
   }
 
   return ret;

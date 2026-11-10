@@ -229,7 +229,7 @@ class YDLIDAR_API CYdLidar {
    * @brief Get LiDAR Device information
    * @return true if the device information is correct, If it's not
    */
-  bool getDeviceInfo();
+  bool getDeviceInfo(bool configure_hardware = true);
 
   /**
    * @brief check LiDAR Scan frequency
